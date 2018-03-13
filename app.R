@@ -1,7 +1,7 @@
 # Title: Distribution
 # Author: Thomas Verliefde
 # Date: 2018/03/13
-# Version: 0.4
+# Version: 0.5
 #
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
@@ -53,12 +53,12 @@ ui <- fluidPage(
     
   ),
   
-  fluidRow(
+  fixedRow(
     column(
-      4,
-      plotOutput('distplot',width='250px'),
+      2,
+      plotOutput('distplot',width='100%'),
       tags$style(type = "text/css", "
-                .irs {max-height:30px;width:250px}
+                .irs {max-height:30px;width:100%}
                 .irs-single {display:none;}
                 .js-irs-0 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
                 .irs-grid {display:none !important;}
@@ -108,7 +108,7 @@ ui <- fluidPage(
         HTML("Group Diff: &mu;"),
         min=0.01,
         max=1,
-        value=1,
+        value=.75,
         step=.01
       ),
       sliderInput(
@@ -116,7 +116,7 @@ ui <- fluidPage(
         HTML('Group Diff: &sigma;²'),
         min=0.01,
         max=1,
-        value=1,
+        value=.75,
         step=.01
       # ),
       # sliderInput(
@@ -129,11 +129,11 @@ ui <- fluidPage(
       )
     ),
     column(
-      4,
-      'Col2'
+      5,
+      plotOutput('sampleplot',height='200px',width='100%')
     ),
   column(
-    4,
+    5,
     'COL3'
   )
    )
@@ -141,38 +141,48 @@ ui <- fluidPage(
 )
 
 # Define server logic
-server <- function(input, output) {
+server <- function(input, output, session) {
 
   #
   Palette = c('#e66101','#fdb863','#b2abd2','#5e3c99')
   Lims=c(.01,.99)
+  Iterations=10
+  Group=seq(4)
+  MuMin=-9
+  MuMax=9
+  VarMin=1
+  VarMax=12
   
-  LinTrans = function(x,y) {
+  MuTrans = function(x,y) {
     output = abs(x-1)*y
     return(output)
   }
   
-  ExpTrans = function(x,y) {
-    output = (1 / exp(x-1))^y
+  VarTrans = function(x,y) {
+    output = y^(1-x)
     return(output)
   }
   
-  SeqTrans = function(x,y,z) {
-    output = (x / z) %>% {seq((.^y),(.*2 - 1), length.out = z )}
+  BalTrans = function(x,y,z) {
+    output = (x / z) %>% {seq((.^y),(.*2 - .^y), length.out = z )} %>% round
+    return(output)
   }
-  
   
   MuVec = reactive(
     sapply(
-      seq(-9,9,length.out=4),
-      function(y) LinTrans(input$mu,y)
+      seq(MuMin,MuMax,along.with=Group),
+      function(y) MuTrans(input$mu,y)
     )
     )
   VarVec = reactive(
     sapply(
-      c(0,seq(1,2.5,length.out=3)),
-      function(y) ExpTrans(input$var,y)
+      seq(VarMin,VarMax,along.with=Group),
+      function(y) VarTrans(input$var,y)
     )
+  )
+  
+  BalVec = reactive(
+    BalTrans(input$samplesize,input$balance,length(Group))
   )
   
   DistFunc=reactive({
@@ -183,21 +193,20 @@ server <- function(input, output) {
   
   DataDist=reactive({
     tibble(
-      x = c(
-        DistFunc()[[2]](Lims,MuVec()[[1]],VarVec()[[1]]),
-        DistFunc()[[2]](Lims,MuVec()[[2]],VarVec()[[2]]),
-        DistFunc()[[2]](Lims,MuVec()[[3]],VarVec()[[3]]),
-        DistFunc()[[2]](Lims,MuVec()[[4]],VarVec()[[4]])
+      x = sapply(
+        Group,
+        function(x) DistFunc()[[2]](Lims,MuVec()[[x]],VarVec()[[x]])
       ) %>% {c(min(.),max(.))}
     )
   })
   
   output$distplot = renderPlot(
     ggplot(DataDist(),aes(x=x)) +
-      stat_function(fun=DistFunc()[[1]],n=101,args=list(MuVec()[[1]],VarVec()[[1]]),colour=Palette[1]) +
-      stat_function(fun=DistFunc()[[1]],n=101,args=list(MuVec()[[2]],VarVec()[[2]]),colour=Palette[2]) +
-      stat_function(fun=DistFunc()[[1]],n=101,args=list(MuVec()[[3]],VarVec()[[3]]),colour=Palette[3]) +
-      stat_function(fun=DistFunc()[[1]],n=101,args=list(MuVec()[[4]],VarVec()[[4]]),colour=Palette[4]) +
+      sapply(
+        Group,
+        function(x) stat_function(
+          fun=DistFunc()[[1]],n=101,args=list(MuVec()[[x]],VarVec()[[x]]),colour=Palette[x])
+      ) +
       labs(x=NULL,y=NULL) +
       scale_x_continuous(
         breaks=function(x) c(x[1],mean(c(x[1],mean(x))),mean(x),mean(c(x[2],mean(x))),x[2]-.01),
@@ -217,8 +226,40 @@ server <- function(input, output) {
         plot.margin = unit(c(0,0,.5,0),'cm')
       )
   )
+  
+  SampledData=
+    reactive(
+      replicate(
+        Iterations,
+        expr = sapply( 
+          Group,
+          function(a) replicate(
+            BalVec()[[a]],
+            expr = MuVec()[[a]] + 0 + DistFunc()[[3]](1,0,VarVec()[[a]])
+          )
+        ) %>% unlist %>% as_tibble %>% unlist %T>% {input$resample} # fake dependency on button
+      ) %>% as_tibble %>% mutate(Grouping = rep(Group,BalVec()) %>% as.factor)
+    )
+  
+  eventReactive(input$resample,SampledData())
+  
+  output$sampleplot = renderPlot(
+    ggplot(SampledData(),aes(y=Grouping,colour=Grouping)) +
+      geom_jitter(aes(x=V1),position = position_jitter(w=0,h=0.1)) +
+      scale_colour_manual(values=Palette) +
+      labs(x=NULL,y=NULL)+
+      guides(colour=F) +
+      theme(
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill='gray98'),
+        axis.ticks = element_blank(),
+        axis.text = element_blank()
+      )
+  )
+  
 }
 
 # Run the application 
 shinyApp(ui = ui, server = server)
-
