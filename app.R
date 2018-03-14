@@ -1,7 +1,7 @@
 # Title: Distribution
 # Author: Thomas Verliefde
-# Date: 2018/03/13
-# Version: 0.5
+# Date: 2018/03/14
+# Version: 0.8
 #
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
@@ -11,7 +11,7 @@
 #    http://shiny.rstudio.com/
 #
 
-list.of.packages = c("shiny","ggplot2","stats","sn","tidyr","dplyr","shinyjs","magrittr");new.packages = list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])];if(length(new.packages)){install.packages(new.packages,repos="http://cran.us.r-project.org")};lapply(list.of.packages,require,character.only=T);rm(list.of.packages,new.packages)
+list.of.packages = c("shiny","ggplot2","stats","sn","tidyr","dplyr","shinyjs","magrittr",'cowplot');new.packages = list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])];if(length(new.packages)){install.packages(new.packages,repos="http://cran.us.r-project.org")};lapply(list.of.packages,require,character.only=T);rm(list.of.packages,new.packages)
 
 # Define UI
 ui <- fluidPage(
@@ -20,7 +20,7 @@ ui <- fluidPage(
   fluidRow(
     column(
       1,
-      actionButton('resample','Resample',icon('refresh'),
+      actionButton('sample','Sample',icon('refresh'),
                    style="position:relative;
                         font-size:115%;
                         margin-top:10px;
@@ -30,7 +30,7 @@ ui <- fluidPage(
     column(
       6,
       offset=1,
-      'F-Distribution & Violations of Assumptions',
+      'F-Distribution Violations of Assumptions',
       style="position:relative;
             margin-top:8px;
             font-family:Lucida Console, sans-serif;
@@ -42,7 +42,7 @@ ui <- fluidPage(
       4,
       selectInput(
         'distribution',NULL,
-        c('Normal Distribution','Something Else Non-Implemented')
+        c('Normal Distribution')
         ),
       style="position:relative;
             margin-top:10px;
@@ -55,12 +55,14 @@ ui <- fluidPage(
   
   fixedRow(
     column(
-      2,
-      plotOutput('distplot',width='100%'),
+      3,
+      plotOutput('distplot',width='200px'),
       tags$style(type = "text/css", "
-                .irs {max-height:30px;width:100%}
+                .irs {max-height:30px;width:200px}
                 .irs-single {display:none;}
                 .js-irs-0 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
+                .js-irs-5 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
+                .js-irs-6 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
                 .irs-grid {display:none !important;}
                 .irs-bar {background:#c8cfa1;border:1px solid #999fbd;}
                 .irs-bar-edge {background:#c8cfa1;border-left:1px solid #999fbd;
@@ -73,6 +75,18 @@ ui <- fluidPage(
                                     left:0px;background:#ffffff;
                                     font-size:80%;}
                 .js-irs-0 .irs-max {visibility:visible !important;
+                                    background:#ffffff;
+                                    font-size:80%;}
+                .js-irs-5 .irs-min {visibility:visible !important;
+                                    left:0px;background:#ffffff;
+                                    font-size:80%;}
+                .js-irs-5 .irs-max {visibility:visible !important;
+                                    background:#ffffff;
+                                    font-size:80%;}
+                .js-irs-6 .irs-min {visibility:visible !important;
+                                    left:0px;background:#ffffff;
+                                    font-size:80%;}
+                .js-irs-6 .irs-max {visibility:visible !important;
                                     background:#ffffff;
                                     font-size:80%;}
                 .js-irs-1 .irs .irs-min:after {content:'Unbalanced';}
@@ -118,23 +132,39 @@ ui <- fluidPage(
         max=1,
         value=.75,
         step=.01
-      # ),
-      # sliderInput(
-      #   'independence',
-      #   'Dependence',
-      #   min=0.01,
-      #   max=1,
-      #   value=1,
-      #   step=.01
-      )
+      ),
+      sliderInput(
+        'independence',
+        'Dependence',
+        min=0.01,
+        max=1,
+        value=1,
+        step=.01
+      ) %>% disabled
     ),
     column(
-      5,
-      plotOutput('sampleplot',height='200px',width='100%')
+      4,
+      plotOutput('sampleplot',width='300px'),
+      sliderInput(
+        'iter',
+        'Iterations',
+        min=10,
+        max=1000,
+        value=250,
+        step=10
+      ) %>% disabled,
+      sliderInput(
+        'groups',
+        'Groups',
+        min=2,
+        max=6,
+        value=4,
+        step=1
+      ) %>% disabled
     ),
   column(
     5,
-    'COL3'
+    plotOutput('fplot',width='100%')
   )
    )
  
@@ -143,11 +173,10 @@ ui <- fluidPage(
 # Define server logic
 server <- function(input, output, session) {
 
-  #
   Palette = c('#e66101','#fdb863','#b2abd2','#5e3c99')
   Lims=c(.01,.99)
-  Iterations=10
-  Group=seq(4)
+  Iterations=isolate(input$iter)
+  Group=isolate(seq(input$groups))
   MuMin=-9
   MuMax=9
   VarMin=1
@@ -187,7 +216,7 @@ server <- function(input, output, session) {
   
   DistFunc=reactive({
     switch(input$distribution,
-           'Normal Distribution' = c(dnorm,qnorm,rnorm)
+           'Normal Distribution' = c(dnorm,qnorm,rnorm,df)
     )}
   )
   
@@ -219,6 +248,7 @@ server <- function(input, output, session) {
         panel.background = element_blank(),
         axis.ticks.y = element_blank(),
         axis.text.y = element_blank(),
+        axis.line.y = element_blank(),
         axis.ticks.x = element_line(colour='black'),
         axis.text.x = element_blank(),
         axis.ticks.length = unit(.3,"cm"),
@@ -227,39 +257,133 @@ server <- function(input, output, session) {
       )
   )
   
-  SampledData=
+
+  SampledData =
     reactive(
-      replicate(
-        Iterations,
-        expr = sapply( 
-          Group,
-          function(a) replicate(
-            BalVec()[[a]],
-            expr = MuVec()[[a]] + 0 + DistFunc()[[3]](1,0,VarVec()[[a]])
-          )
-        ) %>% unlist %>% as_tibble %>% unlist %T>% {input$resample} # fake dependency on button
-      ) %>% as_tibble %>% mutate(Grouping = rep(Group,BalVec()) %>% as.factor)
+      isolate(
+        replicate(
+          Iterations,
+          expr = sapply(
+            Group,
+            function(a) replicate(
+              BalVec()[[a]],
+              expr = MuVec()[[a]] + 0 + DistFunc()[[3]](1,0,VarVec()[[a]])
+            )
+          ) %>% unlist %>% as_tibble %>% unlist
+        ) %>% as_tibble %>% mutate(Grouping = rep(Group,BalVec()) %>% as.factor)
+      ) %T>% {input$sample}
     )
   
-  eventReactive(input$resample,SampledData())
+  ListPlots = reactive(
+    lapply(
+      SampledData() %>% select(1:4),
+      function(a) {ggplot(SampledData(),aes(x=a,y=Grouping,colour=Grouping)) +
+          geom_jitter(position = position_jitter(w=0,h=0.1)) +
+          scale_colour_manual(values=Palette) +
+          labs(x=NULL,y=NULL)+
+          guides(colour=F) +
+          theme(
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            panel.border = element_blank(),
+            panel.background = element_rect(fill='gray98'),
+            axis.ticks = element_blank(),
+            axis.text = element_blank(),
+            axis.line = element_blank()
+          )}
+    )
+  )
   
   output$sampleplot = renderPlot(
-    ggplot(SampledData(),aes(y=Grouping,colour=Grouping)) +
-      geom_jitter(aes(x=V1),position = position_jitter(w=0,h=0.1)) +
-      scale_colour_manual(values=Palette) +
-      labs(x=NULL,y=NULL)+
-      guides(colour=F) +
+    plot_grid(
+      ListPlots()[[1]],
+      ListPlots()[[2]],
+      ListPlots()[[3]],
+      ggdraw() +
+        draw_label('. . .',size=30),
+      ListPlots()[[4]],
+      ncol=1,
+      align='v'
+    )
+  )
+  
+  FData = reactive(
+    SampledData() %>%
+      summarize_at(
+        vars(-Grouping),
+        function(x) aov(x ~ Grouping,data=.) %>%
+          summary %>% unlist(recursive=F) %$% `F value`[[1]]
+      ) %>% gather
+  )
+  
+  # Fdata2 = SampledData2 %>%
+  #   summarize_at(
+  #     vars(-Grouping),
+  #     function(x) aov(x ~ Grouping,data=.) %>%
+  #       summary %>% unlist(recursive=F) %$% `F value`[[1]]
+  #   ) %>% gather
+
+
+  output$fplot = renderPlot(
+    ggplot(FData(),aes(x=value)) +
+      geom_histogram(bins=input$iter / 5) +
+      # stat_function(
+      #   fun=DistFunc()[[4]],n=101,args=list(input$groups-1,input$samplesize-input$groups-1),colour='red'
+      # ) + # not sure about degrees of freedom ... samplesize - groups (-1)??
+      labs(x=NULL,y=NULL) +
+      scale_x_continuous(
+        breaks=function(x) c(x[1],mean(c(x[1],mean(x))),mean(x),mean(c(x[2],mean(x))),x[2]-.01),
+        expand=c(0,0)) +
       theme(
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_blank(),
-        panel.background = element_rect(fill='gray98'),
-        axis.ticks = element_blank(),
-        axis.text = element_blank()
+        panel.background = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.line.y = element_blank(),
+        axis.ticks.x = element_line(colour='black'),
+        axis.text.x = element_blank(),
+        axis.ticks.length = unit(.3,"cm"),
+        axis.line.x = element_line(colour='black'),
+        plot.margin = unit(c(0,0,.5,0),'cm')
       )
   )
+
+  # 
+  # balvectest = BalTrans(40,1,length(Group))
+  # distfunctest = c(dnorm,qnorm,rnorm)
+  # muvectest = sapply(
+  #   seq(MuMin,MuMax,along.with=Group),
+  #   function(y) MuTrans(.85,y)
+  # )
+  # varvectest =  sapply(
+  #   seq(VarMin,VarMax,along.with=Group),
+  #   function(y) VarTrans(.85,y)
+  # )
+  # 
+  # 
+  # SampledData2=
+  #     replicate(
+  #       Iterations,
+  #       expr = sapply(
+  #         Group,
+  #         function(a) replicate(
+  #           balvectest[[a]],
+  #           expr = muvectest[[a]] + 0 + distfunctest[[3]](1,0,varvectest[[a]])
+  #         )
+  #       ) %>% unlist %>% as_tibble %>% unlist
+  #     ) %>% as_tibble %>% mutate(Grouping = rep(c(1,2,3,4),balvectest))
+  # 
+  # ggplot(data = SampledData2, aes(x=V1,y=Grouping,colour=Grouping %>% as.factor)) +
+  #   geom_jitter(position=position_jitter(w=0,h=0.1)) +
+  #   scale_colour_manual(values=Palette) +
+  #   guides(colour=F)
+
+  
   
 }
 
 # Run the application 
 shinyApp(ui = ui, server = server)
+
