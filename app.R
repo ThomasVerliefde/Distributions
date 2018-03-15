@@ -330,12 +330,12 @@ server <- function(input, output, session) {
       ) %>% gather
   )
   
-  Fdata2 = SampledData2 %>%
-    summarize_at(
-      vars(-Grouping),
-      function(x) aov(x ~ Grouping,data=.) %>%
-        summary %>% unlist(recursive=F) %$% `F value`[[1]]
-    ) %>% gather
+ # Fdata2 = SampledData2 %>%
+ #   summarize_at(
+ #     vars(-Grouping),
+ #     function(x) aov(x ~ Grouping,data=.) %>%
+ #       summary %>% unlist(recursive=F) %$% `F value`[[1]]
+ #   ) %>% gather
 
   output$fplot = renderPlot(
     ggplot(FData(),aes(x=value)) +
@@ -374,14 +374,14 @@ server <- function(input, output, session) {
   )
 
   
-  ggplot(Fdata2,aes(x=value)) +
-    stat_density(geom='line')+
-    geom_histogram(
-      aes(y=..density..,fill=sig),
-      colour='black',
-      bins=50
-      ) +
-    scale_fill_manual(values=c('transparent','green'))
+  #ggplot(Fdata2,aes(x=value)) +
+  #  stat_density(geom='line')+
+  #  geom_histogram(
+  #    aes(y=..density..,fill=sig),
+  #    colour='black',
+  #    bins=50
+  #    ) +
+  #  scale_fill_manual(values=c('transparent','green'))
   
   # 
   # balvectest = BalTrans(40,1,length(Group))
