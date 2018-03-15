@@ -1,7 +1,7 @@
 # Title: Distribution
 # Author: Thomas Verliefde
-# Date: 2018/03/14
-# Version: 0.8
+# Date: 2018/03/15
+# Version: 0.9
 #
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
@@ -11,7 +11,7 @@
 #    http://shiny.rstudio.com/
 #
 
-list.of.packages = c("shiny","ggplot2","stats","sn","tidyr","dplyr","shinyjs","magrittr",'cowplot');new.packages = list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])];if(length(new.packages)){install.packages(new.packages,repos="http://cran.us.r-project.org")};lapply(list.of.packages,require,character.only=T);rm(list.of.packages,new.packages)
+list.of.packages = c("shiny","ggplot2","stats","tidyr","dplyr","shinyjs","magrittr",'cowplot');new.packages = list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])];if(length(new.packages)){install.packages(new.packages,repos="http://cran.us.r-project.org")};lapply(list.of.packages,require,character.only=T);rm(list.of.packages,new.packages)
 
 # Define UI
 ui <- fluidPage(
@@ -30,7 +30,7 @@ ui <- fluidPage(
     column(
       6,
       offset=1,
-      'F-Distribution Violations of Assumptions',
+      'F-Distribution & Violations of Assumptions',
       style="position:relative;
             margin-top:8px;
             font-family:Lucida Console, sans-serif;
@@ -48,7 +48,7 @@ ui <- fluidPage(
             margin-top:10px;
             font-size:115%;
             font-family:Lucida Console, sans-serif"
-    )
+    ) %>% disabled
 
     
   ),
@@ -63,6 +63,7 @@ ui <- fluidPage(
                 .js-irs-0 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
                 .js-irs-5 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
                 .js-irs-6 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
+                .js-irs-7 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
                 .irs-grid {display:none !important;}
                 .irs-bar {background:#c8cfa1;border:1px solid #999fbd;}
                 .irs-bar-edge {background:#c8cfa1;border-left:1px solid #999fbd;
@@ -122,7 +123,7 @@ ui <- fluidPage(
         HTML("Group Diff: &mu;"),
         min=0.01,
         max=1,
-        value=.75,
+        value=1,
         step=.01
       ),
       sliderInput(
@@ -130,7 +131,7 @@ ui <- fluidPage(
         HTML('Group Diff: &sigma;²'),
         min=0.01,
         max=1,
-        value=.75,
+        value=.95,
         step=.01
       ),
       sliderInput(
@@ -164,7 +165,15 @@ ui <- fluidPage(
     ),
   column(
     5,
-    plotOutput('fplot',width='100%')
+    plotOutput('fplot',width='100%'),
+    sliderInput(
+      'alpha',
+      HTML('Significance: &alpha;'),
+      min=0,
+      max=1,
+      value=.95,
+      step=.01
+    ) %>% disabled
   )
    )
  
@@ -173,14 +182,23 @@ ui <- fluidPage(
 # Define server logic
 server <- function(input, output, session) {
 
+  DistFunc=reactive({
+    switch(input$distribution,
+           'Normal Distribution' = c(dnorm,qnorm,rnorm,df,qf)
+    )}
+  )
+  
   Palette = c('#e66101','#fdb863','#b2abd2','#5e3c99')
   Lims=c(.01,.99)
   Iterations=isolate(input$iter)
   Group=isolate(seq(input$groups))
-  MuMin=-9
-  MuMax=9
+  MuMin=-2
+  MuMax=2
   VarMin=1
   VarMax=12
+  Df1=isolate(input$groups-1)
+  Df2=isolate(input$samplesize-input$groups)
+  SignifVal=isolate(DistFunc()[[5]](input$alpha,Df1,Df2))
   
   MuTrans = function(x,y) {
     output = abs(x-1)*y
@@ -214,11 +232,7 @@ server <- function(input, output, session) {
     BalTrans(input$samplesize,input$balance,length(Group))
   )
   
-  DistFunc=reactive({
-    switch(input$distribution,
-           'Normal Distribution' = c(dnorm,qnorm,rnorm,df)
-    )}
-  )
+
   
   DataDist=reactive({
     tibble(
@@ -316,24 +330,33 @@ server <- function(input, output, session) {
       ) %>% gather
   )
   
-  # Fdata2 = SampledData2 %>%
-  #   summarize_at(
-  #     vars(-Grouping),
-  #     function(x) aov(x ~ Grouping,data=.) %>%
-  #       summary %>% unlist(recursive=F) %$% `F value`[[1]]
-  #   ) %>% gather
-
+  Fdata2 = SampledData2 %>%
+    summarize_at(
+      vars(-Grouping),
+      function(x) aov(x ~ Grouping,data=.) %>%
+        summary %>% unlist(recursive=F) %$% `F value`[[1]]
+    ) %>% gather
 
   output$fplot = renderPlot(
     ggplot(FData(),aes(x=value)) +
-      geom_histogram(bins=input$iter / 5) +
-      # stat_function(
-      #   fun=DistFunc()[[4]],n=101,args=list(input$groups-1,input$samplesize-input$groups-1),colour='red'
-      # ) + # not sure about degrees of freedom ... samplesize - groups (-1)??
+      geom_histogram(aes(y=..density..),
+                     bins=50,
+                     fill='transparent',
+                     colour='black') +
+      stat_function(
+        fun=DistFunc()[[4]],n=101,
+      args=list(df1=Df1,df2=Df2),colour='red1'
+      ) +
+      stat_function(geom='density',
+                    fun=DistFunc()[[4]],n=101,
+                    args=list(df1=Df1,df2=Df2),fill='red1',colour='transparent',
+                    xlim=c(SignifVal,max(FData()$value)),
+                    alpha=.5) +
       labs(x=NULL,y=NULL) +
       scale_x_continuous(
         breaks=function(x) c(x[1],mean(c(x[1],mean(x))),mean(x),mean(c(x[2],mean(x))),x[2]-.01),
-        expand=c(0,0)) +
+        expand=c(0,0.1)) +
+      guides(fill=FALSE) +
       theme(
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
@@ -350,6 +373,16 @@ server <- function(input, output, session) {
       )
   )
 
+  
+  ggplot(Fdata2,aes(x=value)) +
+    stat_density(geom='line')+
+    geom_histogram(
+      aes(y=..density..,fill=sig),
+      colour='black',
+      bins=50
+      ) +
+    scale_fill_manual(values=c('transparent','green'))
+  
   # 
   # balvectest = BalTrans(40,1,length(Group))
   # distfunctest = c(dnorm,qnorm,rnorm)
