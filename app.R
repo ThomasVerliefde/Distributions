@@ -68,7 +68,7 @@ ui <- fluidPage(
     column(
       4,
       tags$style(type = "text/css", "
-                .irs {max-height:30px;width:100%;}
+                .irs {max-height:30px;}
                 .irs-single {display:none;}
                 .js-irs-4 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
                 .js-irs-3 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
