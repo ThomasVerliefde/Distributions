@@ -143,10 +143,10 @@ ui <- fluidPage(
         'iter',
         'Iterations',
         min=10,
-        max=1000,
+        max=500,
         value=250,
         step=10
-      ) %>% disabled,
+      ),
       sliderInput(
         'samplesize',
         'Sample Size (n)',
@@ -197,7 +197,7 @@ server <- function(input, output, session) {
   
   Palette = c('#e66101','#fdb863','#b2abd2','#5e3c99')
   Lims=c(.01,.99)
-  Iterations=isolate(input$iter)
+  # Iterations=isolate(input$iter)
   Group=isolate(seq(input$groups))
   MuMin=-5
   MuMax=5
@@ -283,7 +283,7 @@ server <- function(input, output, session) {
     reactive(
       isolate(
         replicate(
-          Iterations,
+          input$iter,
           expr = sapply(
             Group,
             function(a) replicate(
