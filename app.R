@@ -1,7 +1,7 @@
 # Title: Distribution
 # Author: Thomas Verliefde
-# Date: 2018/03/15
-# Version: 0.9
+# Date: 2018/03/20
+# Version: 0.92
 #
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
@@ -52,18 +52,28 @@ ui <- fluidPage(
 
     
   ),
+  fluidRow(
+    div(
+    plotOutput('distplot',width='20%'),
+    plotOutput('sampleplot',width='35%'),
+    plotOutput('fplot',width='40%'),
+    class='shiny-flow-layout',
+    style='margin-left:15px;
+           margin-top:10px;'
+    )
+    
+  ),
   
-  fixedRow(
+  fluidRow(
     column(
-      3,
-      plotOutput('distplot',width='200px'),
+      4,
       tags$style(type = "text/css", "
-                .irs {max-height:30px;width:200px}
+                .irs {max-height:30px;width:200px;}
                 .irs-single {display:none;}
-                .js-irs-0 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
-                .js-irs-5 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
+                .js-irs-4 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
+                .js-irs-3 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
+                .js-irs-2 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
                 .js-irs-6 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
-                .js-irs-7 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
                 .irs-grid {display:none !important;}
                 .irs-bar {background:#c8cfa1;border:1px solid #999fbd;}
                 .irs-bar-edge {background:#c8cfa1;border-left:1px solid #999fbd;
@@ -72,36 +82,71 @@ ui <- fluidPage(
                 .irs-min {visibility:hidden !important;
                           left:-22px;}
                 .irs-max {visibility:hidden !important;}
-                .js-irs-0 .irs-min {visibility:visible !important;
+                .js-irs-4 .irs-min {visibility:visible !important;
                                     left:0px;background:#ffffff;
                                     font-size:80%;}
-                .js-irs-0 .irs-max {visibility:visible !important;
+                .js-irs-4 .irs-max {visibility:visible !important;
                                     background:#ffffff;
                                     font-size:80%;}
-                .js-irs-5 .irs-min {visibility:visible !important;
+                .js-irs-3 .irs-min {visibility:visible !important;
                                     left:0px;background:#ffffff;
                                     font-size:80%;}
-                .js-irs-5 .irs-max {visibility:visible !important;
+                .js-irs-3 .irs-max {visibility:visible !important;
                                     background:#ffffff;
                                     font-size:80%;}
-                .js-irs-6 .irs-min {visibility:visible !important;
+                .js-irs-2 .irs-min {visibility:visible !important;
                                     left:0px;background:#ffffff;
                                     font-size:80%;}
-                .js-irs-6 .irs-max {visibility:visible !important;
+                .js-irs-2 .irs-max {visibility:visible !important;
                                     background:#ffffff;
                                     font-size:80%;}
-                .js-irs-1 .irs .irs-min:after {content:'Unbalanced';}
-                .js-irs-1 .irs .irs-max:after {content:'Balanced';}
-                .js-irs-2 .irs .irs-min:after {content:'Heterogeneity';}
-                .js-irs-2 .irs .irs-max:after {content:'Homogeneity';}
-                .js-irs-3 .irs .irs-min:after {content:'Heterogeneity';}
-                .js-irs-3 .irs .irs-max:after {content:'Homogeneity';}
-                .js-irs-4 .irs .irs-min:after {content:'Dependence';}
-                .js-irs-4 .irs .irs-max:after {content:'Independence';}
+                .js-irs-5 .irs .irs-min:after {content:'Unbalanced';}
+                .js-irs-5 .irs .irs-max:after {content:'Balanced';}
+                .js-irs-0 .irs .irs-min:after {content:'Heterogeneity';}
+                .js-irs-0 .irs .irs-max:after {content:'Homoscedasticity';}
+                .js-irs-1 .irs .irs-min:after {content:'Heteroscedasticity';}
+                .js-irs-1 .irs .irs-max:after {content:'Homoscedasticity';}
+                .js-irs-7 .irs .irs-min:after {content:'Dependence';}
+                .js-irs-7 .irs .irs-max:after {content:'Independence';}
                 .irs-min:after {visibility: visible !important;}
                 .irs-max:after {visibility: visible !important;}
                 .irs-all {top:-10px;}
                 "),
+      sliderInput(
+        'mu',
+        HTML("Group Diff: &mu;"),
+        min=0.01,
+        max=1,
+        value=.99,
+        step=.01
+      ),
+      sliderInput(
+        'var',
+        HTML('Group Diff: &sigma;²'),
+        min=0.01,
+        max=1,
+        value=1,
+        step=.01
+      ),
+      sliderInput(
+        'groups',
+        'Groups',
+        min=2,
+        max=6,
+        value=4,
+        step=1
+      ) %>% disabled
+      ),
+    column(
+      4,
+      sliderInput(
+        'iter',
+        'Iterations',
+        min=10,
+        max=1000,
+        value=250,
+        step=10
+      ) %>% disabled,
       sliderInput(
         'samplesize',
         'Sample Size (n)',
@@ -117,55 +162,10 @@ ui <- fluidPage(
         max=1,
         value=1,
         step=.01
-      ),
-      sliderInput(
-        'mu',
-        HTML("Group Diff: &mu;"),
-        min=0.01,
-        max=1,
-        value=1,
-        step=.01
-      ),
-      sliderInput(
-        'var',
-        HTML('Group Diff: &sigma;²'),
-        min=0.01,
-        max=1,
-        value=.95,
-        step=.01
-      ),
-      sliderInput(
-        'independence',
-        'Dependence',
-        min=0.01,
-        max=1,
-        value=1,
-        step=.01
-      ) %>% disabled
-    ),
-    column(
-      4,
-      plotOutput('sampleplot',width='300px'),
-      sliderInput(
-        'iter',
-        'Iterations',
-        min=10,
-        max=1000,
-        value=250,
-        step=10
-      ) %>% disabled,
-      sliderInput(
-        'groups',
-        'Groups',
-        min=2,
-        max=6,
-        value=4,
-        step=1
-      ) %>% disabled
+      )
     ),
   column(
-    5,
-    plotOutput('fplot',width='100%'),
+    4,
     sliderInput(
       'alpha',
       HTML('Significance: &alpha;'),
@@ -173,10 +173,17 @@ ui <- fluidPage(
       max=1,
       value=.95,
       step=.01
+    ) %>% disabled,
+    sliderInput(
+      'independence',
+      'Dependence',
+      min=0.01,
+      max=1,
+      value=1,
+      step=.01
     ) %>% disabled
   )
-   )
- 
+  )
 )
 
 # Define server logic
@@ -192,10 +199,10 @@ server <- function(input, output, session) {
   Lims=c(.01,.99)
   Iterations=isolate(input$iter)
   Group=isolate(seq(input$groups))
-  MuMin=-2
-  MuMax=2
+  MuMin=-5
+  MuMax=5
   VarMin=1
-  VarMax=12
+  VarMax=10
   Df1=isolate(input$groups-1)
   Df2=isolate(input$samplesize-input$groups)
   SignifVal=isolate(DistFunc()[[5]](input$alpha,Df1,Df2))
@@ -250,7 +257,7 @@ server <- function(input, output, session) {
         function(x) stat_function(
           fun=DistFunc()[[1]],n=101,args=list(MuVec()[[x]],VarVec()[[x]]),colour=Palette[x])
       ) +
-      labs(x=NULL,y=NULL) +
+      labs(x=NULL,y=NULL,title='Theoretical Distributions') +
       scale_x_continuous(
         breaks=function(x) c(x[1],mean(c(x[1],mean(x))),mean(x),mean(c(x[2],mean(x))),x[2]-.01),
         expand=c(0,0)) +
@@ -267,7 +274,7 @@ server <- function(input, output, session) {
         axis.text.x = element_blank(),
         axis.ticks.length = unit(.3,"cm"),
         axis.line.x = element_line(colour='black'),
-        plot.margin = unit(c(0,0,.5,0),'cm')
+        plot.margin = unit(c(0.1,0,.5,0),'cm')
       )
   )
   
@@ -310,14 +317,17 @@ server <- function(input, output, session) {
   
   output$sampleplot = renderPlot(
     plot_grid(
+      ggdraw() +
+        draw_label('Sampled Distributions',fontface='bold'),
       ListPlots()[[1]],
       ListPlots()[[2]],
       ListPlots()[[3]],
       ggdraw() +
-        draw_label('. . .',size=30),
+        draw_label('. . .',size=30,fontface='bold'),
       ListPlots()[[4]],
       ncol=1,
-      align='v'
+      align='v',
+      rel_heights=c(0.2,1,1,1,.3,1)
     )
   )
   
@@ -330,12 +340,12 @@ server <- function(input, output, session) {
       ) %>% gather
   )
   
- # Fdata2 = SampledData2 %>%
- #   summarize_at(
- #     vars(-Grouping),
- #     function(x) aov(x ~ Grouping,data=.) %>%
- #       summary %>% unlist(recursive=F) %$% `F value`[[1]]
- #   ) %>% gather
+  # Fdata2 = SampledData2 %>%
+  #   summarize_at(
+  #     vars(-Grouping),
+  #     function(x) aov(x ~ Grouping,data=.) %>%
+  #       summary %>% unlist(recursive=F) %$% `F value`[[1]]
+  #   ) %>% gather
 
   output$fplot = renderPlot(
     ggplot(FData(),aes(x=value)) +
@@ -352,10 +362,10 @@ server <- function(input, output, session) {
                     args=list(df1=Df1,df2=Df2),fill='red1',colour='transparent',
                     xlim=c(SignifVal,max(FData()$value)),
                     alpha=.5) +
-      labs(x=NULL,y=NULL) +
+      labs(x=NULL,y=NULL,title='F-Distribution') +
       scale_x_continuous(
         breaks=function(x) c(x[1],mean(c(x[1],mean(x))),mean(x),mean(c(x[2],mean(x))),x[2]-.01),
-        expand=c(0,0.1)) +
+        expand=c(0,0.7)) +
       guides(fill=FALSE) +
       theme(
         panel.grid.major = element_blank(),
@@ -369,19 +379,19 @@ server <- function(input, output, session) {
         axis.text.x = element_blank(),
         axis.ticks.length = unit(.3,"cm"),
         axis.line.x = element_line(colour='black'),
-        plot.margin = unit(c(0,0,.5,0),'cm')
+        plot.margin = unit(c(0.15,0,.5,0),'cm')
       )
   )
 
   
-  #ggplot(Fdata2,aes(x=value)) +
-  #  stat_density(geom='line')+
-  #  geom_histogram(
-  #    aes(y=..density..,fill=sig),
-  #    colour='black',
-  #    bins=50
-  #    ) +
-  #  scale_fill_manual(values=c('transparent','green'))
+  # ggplot(Fdata2,aes(x=value)) +
+  #   stat_density(geom='line')+
+  #   geom_histogram(
+  #     aes(y=..density..,fill=sig),
+  #     colour='black',
+  #     bins=50
+  #     ) +
+  #   scale_fill_manual(values=c('transparent','green'))
   
   # 
   # balvectest = BalTrans(40,1,length(Group))
