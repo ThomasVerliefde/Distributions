@@ -54,9 +54,9 @@ ui <- fluidPage(
   ),
   fluidRow(
     div(
-    plotOutput('distplot',width='20%'),
-    plotOutput('sampleplot',width='35%'),
-    plotOutput('fplot',width='40%'),
+    plotOutput('distplot',width='30%'),
+    plotOutput('sampleplot',width='30%'),
+    plotOutput('fplot',width='30%'),
     class='shiny-flow-layout',
     style='margin-left:15px;
            margin-top:10px;'
@@ -68,7 +68,7 @@ ui <- fluidPage(
     column(
       4,
       tags$style(type = "text/css", "
-                .irs {max-height:30px;width:200px;}
+                .irs {max-height:30px;width:100%;}
                 .irs-single {display:none;}
                 .js-irs-4 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
                 .js-irs-3 .irs-single {display:inline;background:#c8cfa1;color:#000000;}
@@ -103,7 +103,7 @@ ui <- fluidPage(
                 .js-irs-5 .irs .irs-min:after {content:'Unbalanced';}
                 .js-irs-5 .irs .irs-max:after {content:'Balanced';}
                 .js-irs-0 .irs .irs-min:after {content:'Heterogeneity';}
-                .js-irs-0 .irs .irs-max:after {content:'Homoscedasticity';}
+                .js-irs-0 .irs .irs-max:after {content:'Homogeneity';}
                 .js-irs-1 .irs .irs-min:after {content:'Heteroscedasticity';}
                 .js-irs-1 .irs .irs-max:after {content:'Homoscedasticity';}
                 .js-irs-7 .irs .irs-min:after {content:'Dependence';}
