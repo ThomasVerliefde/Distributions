@@ -1,7 +1,7 @@
 # Title: Distribution
 # Author: Thomas Verliefde
-# Date: 2018/03/20
-# Version: 0.92
+# Date: 2018/04/04
+# Version: 0.95
 #
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
@@ -11,26 +11,34 @@
 #    http://shiny.rstudio.com/
 #
 
-list.of.packages = c("shiny","ggplot2","stats","tidyr","dplyr","shinyjs","magrittr",'cowplot');new.packages = list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])];if(length(new.packages)){install.packages(new.packages,repos="http://cran.us.r-project.org")};lapply(list.of.packages,require,character.only=T);rm(list.of.packages,new.packages)
+# INSTALLS ALL NECESSARY PACKAGES
+
+list.of.packages = c("shiny","ggplot2","stats","tidyr","dplyr","shinyjs","magrittr",'cowplot','sn');new.packages = list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])];if(length(new.packages)){install.packages(new.packages,repos="http://cran.us.r-project.org")};lapply(list.of.packages,require,character.only=T);rm(list.of.packages,new.packages)
+
+
 
 # Define UI
 ui <- fluidPage(
+  # Enables the use of shinyjs-package functions (e.g. disabled)
   useShinyjs(),
   
   fluidRow(
     column(
-      1,
-      actionButton('sample','Sample',icon('refresh'),
-                   style="position:relative;
-                        font-size:115%;
-                        margin-top:10px;
-                        font-family:Lucida Console, sans-serif;
-                   ")
+      4,
+      # Select which distribution to use for the theoretical distributions
+      selectInput(
+        'distribution',NULL,
+        c('Normal Distribution'='Norm','Skew-Normal Distribution'='SN')
+      ),
+      style="position:relative;
+      margin-top:10px;
+      font-size:115%;
+      font-family:Lucida Console, sans-serif"
     ),
     column(
       6,
-      offset=1,
-      'F-Distribution & Violations of Assumptions',
+      # The title
+      HTML('F-Distribution & Violations of Assumptions'),
       style="position:relative;
             margin-top:8px;
             font-family:Lucida Console, sans-serif;
@@ -39,20 +47,22 @@ ui <- fluidPage(
             font-size:200%;"
     ),
     column(
-      4,
-      selectInput(
-        'distribution',NULL,
-        c('Normal Distribution')
-        ),
-      style="position:relative;
-            margin-top:10px;
-            font-size:115%;
-            font-family:Lucida Console, sans-serif"
-    ) %>% disabled
-
-    
+      1,
+      # The sample button.
+      # Pressing this will resample with the chosen variable values.
+      actionButton('sample','Sample',icon('refresh'),
+                   style="position:relative;
+                   font-size:115%;
+                   margin-top:10px;
+                   font-family:Lucida Console, sans-serif;
+                   ")
+      )
   ),
   fluidRow(
+    # The 3 plots displayed
+    # distplot shows the theoretical plots
+    # sampleplot shows the sampled data
+    # fplot shows the calculated F-distribution with theoretical overlay
     div(
     plotOutput('distplot',width='30%'),
     plotOutput('sampleplot',width='30%'),
@@ -67,6 +77,7 @@ ui <- fluidPage(
   fluidRow(
     column(
       4,
+      # This changes the appearance of the sliders (.irs elements)
       tags$style(type = "text/css", "
                 .irs {max-height:30px;}
                 .irs-single {display:none;}
@@ -112,14 +123,16 @@ ui <- fluidPage(
                 .irs-max:after {visibility: visible !important;}
                 .irs-all {top:-10px;}
                 "),
+      # Slider indicating group differences on mu/mean/location
       sliderInput(
         'mu',
         HTML("Group Diff: &mu;"),
         min=0.01,
         max=1,
-        value=.99,
+        value=.95,
         step=.01
       ),
+      # Slider indicating group differences on sigma/variance/scale
       sliderInput(
         'var',
         HTML('Group Diff: &sigma;²'),
@@ -128,6 +141,9 @@ ui <- fluidPage(
         value=1,
         step=.01
       ),
+      # Slider indicating the amount of groups
+      # This slider is not constructed or tested to work with any other value than 4
+      # As such, this slider is disabeld, and only used as an indicator.
       sliderInput(
         'groups',
         'Groups',
@@ -135,10 +151,12 @@ ui <- fluidPage(
         max=6,
         value=4,
         step=1
-      ) %>% disabled
+      ) %>% disabled # '%>% disabled' makes this slider not clickable
       ),
     column(
       4,
+      # Slider indicating how many times a group of samples is drawn.
+      # Setting this low will lead to unreliable results.
       sliderInput(
         'iter',
         'Iterations',
@@ -147,6 +165,7 @@ ui <- fluidPage(
         value=250,
         step=10
       ),
+      # Slider indicating the total sample size of 1 iteration of samples.
       sliderInput(
         'samplesize',
         'Sample Size (n)',
@@ -155,6 +174,9 @@ ui <- fluidPage(
         value=40,
         step=4
       ),
+      # Slider indicating how balanced the groups are.
+      # At value = 1 (default), all groups are balanced and have an equal amount of samples.
+      # At value = 0.01 (minimum), sample sizes differ greatly between groups.
       sliderInput(
         'balance',
         'Group Diff: n',
@@ -166,6 +188,20 @@ ui <- fluidPage(
     ),
   column(
     4,
+    # Checkbox to show the non-central F-distribution
+    # The non-centrality-parameter (lambda) is based on the group difference on mu/location.
+    # Note that I'm using checkboxGroupInput, instead of checkboxInput.
+    # The first returns the 'choiceValues', while the latter returns TRUE/FALSE.
+    # Getting values makes it easier to use the 'switch()' function.
+    checkboxGroupInput(
+      'noncentral',NULL,
+      choiceNames=list(HTML('<b>Show Non-Central F-Dist?</b>')),
+      choiceValues=list('noncentral')
+    ),
+    # Slider indicating the significance level
+    # This slider should technically work with different values.
+    # But this has not been tested, and was not the aim.
+    # As such, this slider is disabled, and forms merely an indicator.
     sliderInput(
       'alpha',
       HTML('Significance: &alpha;'),
@@ -174,6 +210,8 @@ ui <- fluidPage(
       value=.95,
       step=.01
     ) %>% disabled,
+    # Slider indicating the level of interdependence.
+    # Not implemented (yet).
     sliderInput(
       'independence',
       'Dependence',
@@ -189,45 +227,79 @@ ui <- fluidPage(
 # Define server logic
 server <- function(input, output, session) {
 
+  # Reactive switch
+  # Based on the selected distribution,
+  # it will select a list of functions to be used.
+  # Note that currently, this serves little value,
+  #  as for both 'Norm' and 'SN' we are using the same
+  #  functions.
+  # It could be extended later.
   DistFunc=reactive({
     switch(input$distribution,
-           'Normal Distribution' = c(dnorm,qnorm,rnorm,df,qf)
+           'Norm' = c(dsn,qsn,rsn,df,qf),
+           'SN' = c(dsn,qsn,rsn,df,qf)
+    )}
+  )
+
+  # Colour palette that will be used for the different groups.
+  # One of the reasons the amount of groups only works for 4.
+  Palette = c('#e66101','#fdb863','#b2abd2','#5e3c99')
+  # Used in DataDist()
+  Lims=c(.01,.99)
+  # sequence of groups, should be c(1,2,3,4), as input$groups is set at 4.
+  Group=isolate(seq(input$groups))
+  # MuMin, MuMax are the minimum and maximum values for mu.
+  # If input$mu (difference between groups on mu) is at 0.01,
+  #  1 group should be at -1, and another group at +1.
+  MuMin=-1
+  MuMax=1
+  # VarMin, VarMax are the minimum and maximum for variance.
+  # If input$var (difference between groups on var) is at 0.01,
+  #  1 group should be at 1, and another group at 10.
+  VarMin=1
+  VarMax=10
+  # Df1, Df2 determine the degrees of freedom for the F-distributions
+  Df1=isolate(input$groups-1)
+  Df2=isolate(input$samplesize-input$groups)
+  # Non-centrality parameter, changes with group difference on mu (input$mu)
+  Lambda = reactive(input$samplesize*0.39*(1-input$mu))
+  # Skewness factor (called alpha by the sn-distribution functions e.g. sn::dsn)
+  # Set to 4 if the Skew-normal Distribution is selected, otherwise is at 0.
+  Skew = reactive({
+    switch(
+      input$distribution,
+      'Norm' = 0,
+      'SN' = 4
     )}
   )
   
-  Palette = c('#e66101','#fdb863','#b2abd2','#5e3c99')
-  Lims=c(.01,.99)
-  # Iterations=isolate(input$iter)
-  Group=isolate(seq(input$groups))
-  MuMin=-5
-  MuMax=5
-  VarMin=1
-  VarMax=10
-  Df1=isolate(input$groups-1)
-  Df2=isolate(input$samplesize-input$groups)
-  SignifVal=isolate(DistFunc()[[5]](input$alpha,Df1,Df2))
-  
+  # Transformation function for mu, to make the 0.01-1 scale function
   MuTrans = function(x,y) {
-    output = abs(x-1)*y
+    output = (1-x)*y
     return(output)
   }
   
+  # Transformation function for var, to make the 0.01-1 scale function
   VarTrans = function(x,y) {
     output = y^(1-x)
     return(output)
   }
   
+  # Transformation function for balance, to make the 0.01-1 scale function
   BalTrans = function(x,y,z) {
     output = (x / z) %>% {seq((.^y),(.*2 - .^y), length.out = z )} %>% round
     return(output)
   }
   
+  # Create a vector of means, 1 for each group
   MuVec = reactive(
     sapply(
       seq(MuMin,MuMax,along.with=Group),
       function(y) MuTrans(input$mu,y)
     )
     )
+  
+  # Create a vector of variances, 1 for each group
   VarVec = reactive(
     sapply(
       seq(VarMin,VarMax,along.with=Group),
@@ -235,12 +307,14 @@ server <- function(input, output, session) {
     )
   )
   
+  # Create a vector of sample sizes, 1 for each group
   BalVec = reactive(
     BalTrans(input$samplesize,input$balance,length(Group))
   )
-  
 
-  
+  # Find the minimum and maximum values based on the q-plot of the chosen distribution
+  # This is used as the minimum and maximum values of the x-axis
+  #  for the theoretical plot.
   DataDist=reactive({
     tibble(
       x = sapply(
@@ -250,12 +324,15 @@ server <- function(input, output, session) {
     )
   })
   
+  # Create the distplot, showing the theoretical plots.
+  # There are 4 stat_function plots, 1 for each group.
   output$distplot = renderPlot(
     ggplot(DataDist(),aes(x=x)) +
       sapply(
         Group,
         function(x) stat_function(
-          fun=DistFunc()[[1]],n=101,args=list(MuVec()[[x]],VarVec()[[x]]),colour=Palette[x])
+          fun=DistFunc()[[1]],n=101,args=list(MuVec()[[x]],VarVec()[[x]],alpha=Skew()),
+          colour=Palette[x])
       ) +
       labs(x=NULL,y=NULL,title='Theoretical Distributions') +
       scale_x_continuous(
@@ -278,7 +355,10 @@ server <- function(input, output, session) {
       )
   )
   
-
+  # This is a system that computes the sampled data.
+  # It is only reactive on 'input$sample'.
+  # Normally, something like this should also work with
+  #  eventReactive(), but I didn't get it to work, so I got a workaround.
   SampledData =
     reactive(
       isolate(
@@ -295,6 +375,8 @@ server <- function(input, output, session) {
       ) %T>% {input$sample}
     )
   
+  # This creates a list of plots showing the sampled data.
+  # This will be used in the output$sampleplot.
   ListPlots = reactive(
     lapply(
       SampledData() %>% select(1:4),
@@ -315,6 +397,9 @@ server <- function(input, output, session) {
     )
   )
   
+  # Creates the output object for the sampled plots.
+  # By utilizing ListPlots, it makes it easier to insert ... after 3.
+  # This is also the only place (I think) that needs the cowplot package.
   output$sampleplot = renderPlot(
     plot_grid(
       ggdraw() +
@@ -331,6 +416,7 @@ server <- function(input, output, session) {
     )
   )
   
+  # Computing the relevant F-distribution data
   FData = reactive(
     SampledData() %>%
       summarize_at(
@@ -340,29 +426,51 @@ server <- function(input, output, session) {
       ) %>% gather
   )
   
-  # Fdata2 = SampledData2 %>%
-  #   summarize_at(
-  #     vars(-Grouping),
-  #     function(x) aov(x ~ Grouping,data=.) %>%
-  #       summary %>% unlist(recursive=F) %$% `F value`[[1]]
-  #   ) %>% gather
+  # FFunc is code for either a central F-distribution, or
+  #  for a noncentral F-distribution, depending on the checkbox earlier.
+  # The main difference is the addition of ncp=Lambda.
+  # This would probably also work the other way around, by changing Lambda
+  #  based on the checkbox.
+  FFunc=reactive({
+    if(is.null(input$noncentral)) {
+      list(
+        "stat_function(
+        fun=DistFunc()[[4]],n=101,
+        args=list(df1=Df1,df2=Df2),colour='red1')",
+        "stat_function(geom='density',
+        fun=DistFunc()[[4]],n=101,
+        args=list(df1=Df1,df2=Df2),fill='red1',colour='transparent',
+        xlim=c(DistFunc()[[5]](input$alpha,Df1,Df2),max(FData()$value)),
+        alpha=.5)",
+        "labs(x=NULL,y=NULL,title='F-Distribution')"
+      )
+    } else {
+      list(
+        "stat_function(
+        fun=DistFunc()[[4]],n=101,
+        args=list(df1=Df1,df2=Df2,ncp=Lambda()),colour='red1')",
+        "stat_function(geom='density',
+        fun=DistFunc()[[4]],n=101,
+        args=list(df1=Df1,df2=Df2,ncp=Lambda()),fill='red1',colour='transparent',
+        xlim=c(DistFunc()[[5]](input$alpha,Df1,Df2,Lambda()),max(FData()$value)),
+        alpha=.5)",
+        "labs(x=NULL,y=NULL,title='Non-Central F-Distribution')"
+      )
+    }
+  })
 
+  # Creates the third plot, the f-distribution sampled histogram,
+  #  with overlay of the theoretical F-distribution.
+  # These overlayplots can be found in FFunc()[1] and FFunc()[2].
   output$fplot = renderPlot(
     ggplot(FData(),aes(x=value)) +
       geom_histogram(aes(y=..density..),
                      bins=50,
                      fill='transparent',
                      colour='black') +
-      stat_function(
-        fun=DistFunc()[[4]],n=101,
-      args=list(df1=Df1,df2=Df2),colour='red1'
-      ) +
-      stat_function(geom='density',
-                    fun=DistFunc()[[4]],n=101,
-                    args=list(df1=Df1,df2=Df2),fill='red1',colour='transparent',
-                    xlim=c(SignifVal,max(FData()$value)),
-                    alpha=.5) +
-      labs(x=NULL,y=NULL,title='F-Distribution') +
+      eval(parse(text=FFunc()[1])) +
+      eval(parse(text=FFunc()[2])) +
+      eval(parse(text=FFunc()[3])) +
       scale_x_continuous(
         breaks=function(x) c(x[1],mean(c(x[1],mean(x))),mean(x),mean(c(x[2],mean(x))),x[2]-.01),
         expand=c(0,0.7)) +
@@ -383,48 +491,6 @@ server <- function(input, output, session) {
       )
   )
 
-  
-  # ggplot(Fdata2,aes(x=value)) +
-  #   stat_density(geom='line')+
-  #   geom_histogram(
-  #     aes(y=..density..,fill=sig),
-  #     colour='black',
-  #     bins=50
-  #     ) +
-  #   scale_fill_manual(values=c('transparent','green'))
-  
-  # 
-  # balvectest = BalTrans(40,1,length(Group))
-  # distfunctest = c(dnorm,qnorm,rnorm)
-  # muvectest = sapply(
-  #   seq(MuMin,MuMax,along.with=Group),
-  #   function(y) MuTrans(.85,y)
-  # )
-  # varvectest =  sapply(
-  #   seq(VarMin,VarMax,along.with=Group),
-  #   function(y) VarTrans(.85,y)
-  # )
-  # 
-  # 
-  # SampledData2=
-  #     replicate(
-  #       Iterations,
-  #       expr = sapply(
-  #         Group,
-  #         function(a) replicate(
-  #           balvectest[[a]],
-  #           expr = muvectest[[a]] + 0 + distfunctest[[3]](1,0,varvectest[[a]])
-  #         )
-  #       ) %>% unlist %>% as_tibble %>% unlist
-  #     ) %>% as_tibble %>% mutate(Grouping = rep(c(1,2,3,4),balvectest))
-  # 
-  # ggplot(data = SampledData2, aes(x=V1,y=Grouping,colour=Grouping %>% as.factor)) +
-  #   geom_jitter(position=position_jitter(w=0,h=0.1)) +
-  #   scale_colour_manual(values=Palette) +
-  #   guides(colour=F)
-
-  
-  
 }
 
 # Run the application 
