@@ -105,12 +105,12 @@ ui <- fluidPage(
                 .js-irs-3 .irs-max {visibility:visible !important;
                                     background:#ffffff;
                                     font-size:80%;}
-                .js-irs-2 .irs-min {visibility:visible !important;
-                                    left:0px;background:#ffffff;
-                                    font-size:80%;}
-                .js-irs-2 .irs-max {visibility:visible !important;
-                                    background:#ffffff;
-                                    font-size:80%;}
+                # .js-irs-2 .irs-min {visibility:visible !important;
+                #                     left:0px;background:#ffffff;
+                #                     font-size:80%;}
+                # .js-irs-2 .irs-max {visibility:visible !important;
+                #                     background:#ffffff;
+                #                     font-size:80%;}
                 .js-irs-5 .irs .irs-max:after {content:'Unbalanced';}
                 .js-irs-5 .irs .irs-min:after {content:'Balanced';}
                 .js-irs-0 .irs .irs-max:after {content:'Heterogeneity';}
