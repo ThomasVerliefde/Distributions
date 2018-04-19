@@ -1,7 +1,7 @@
 # Title: Distribution
 # Author: Thomas Verliefde
-# Date: 2018/04/04
-# Version: 0.95
+# Date: 2018/04/19
+# Version: 1.00
 #
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
@@ -111,14 +111,14 @@ ui <- fluidPage(
                 .js-irs-2 .irs-max {visibility:visible !important;
                                     background:#ffffff;
                                     font-size:80%;}
-                .js-irs-5 .irs .irs-min:after {content:'Unbalanced';}
-                .js-irs-5 .irs .irs-max:after {content:'Balanced';}
-                .js-irs-0 .irs .irs-min:after {content:'Heterogeneity';}
-                .js-irs-0 .irs .irs-max:after {content:'Homogeneity';}
-                .js-irs-1 .irs .irs-min:after {content:'Heteroscedasticity';}
-                .js-irs-1 .irs .irs-max:after {content:'Homoscedasticity';}
-                .js-irs-7 .irs .irs-min:after {content:'Dependence';}
-                .js-irs-7 .irs .irs-max:after {content:'Independence';}
+                .js-irs-5 .irs .irs-max:after {content:'Unbalanced';}
+                .js-irs-5 .irs .irs-min:after {content:'Balanced';}
+                .js-irs-0 .irs .irs-max:after {content:'Heterogeneity';}
+                .js-irs-0 .irs .irs-min:after {content:'Homogeneity';}
+                .js-irs-1 .irs .irs-max:after {content:'Heteroscedasticity';}
+                .js-irs-1 .irs .irs-min:after {content:'Homoscedasticity';}
+                .js-irs-7 .irs .irs-max:after {content:'Dependence';}
+                .js-irs-7 .irs .irs-min:after {content:'Independence';}
                 .irs-min:after {visibility: visible !important;}
                 .irs-max:after {visibility: visible !important;}
                 .irs-all {top:-10px;}
@@ -127,18 +127,18 @@ ui <- fluidPage(
       sliderInput(
         'mu',
         HTML("Group Diff: &mu;"),
-        min=0.01,
-        max=1,
-        value=.95,
+        min=-1,
+        max=-.01,
+        value=-.95,
         step=.01
       ),
       # Slider indicating group differences on sigma/variance/scale
       sliderInput(
         'var',
         HTML('Group Diff: &sigma;²'),
-        min=0.01,
-        max=1,
-        value=1,
+        min=-1,
+        max=-.01,
+        value=-1,
         step=.01
       ),
       # Slider indicating the amount of groups
@@ -180,9 +180,9 @@ ui <- fluidPage(
       sliderInput(
         'balance',
         'Group Diff: n',
-        min=0.01,
-        max=1,
-        value=1,
+        min=-1,
+        max=-.01,
+        value=-1,
         step=.01
       )
     ),
@@ -210,14 +210,19 @@ ui <- fluidPage(
       value=.95,
       step=.01
     ) %>% disabled,
+    checkboxInput(
+      'enableDependence',NULL,
+      label=HTML('<b>Enabling Dependence - Lock Balance</b>'),
+      value=FALSE
+    ),
     # Slider indicating the level of interdependence.
     # Not implemented (yet).
     sliderInput(
-      'independence',
+      'dependence',
       'Dependence',
-      min=0.01,
+      min=0,
       max=1,
-      value=1,
+      value=0,
       step=.01
     ) %>% disabled
   )
@@ -226,6 +231,24 @@ ui <- fluidPage(
 
 # Define server logic
 server <- function(input, output, session) {
+
+  # Observing the enableDependence checkbox.
+  # If TRUE (checked), then it resets the balance slider
+  # If FALSE (unchecked), then it resets the dependence slider
+  observe(
+    if(input$enableDependence) {
+      reset('balance')
+    } else if(input$enableDependence %>% not) {
+      reset('dependence')
+    }
+  )
+  
+  # These two lines enable or disable the 'dependence' and 'balance' sliders.
+  # This is conditional on enableDependence.
+  # If TRUE (checked), then balance is disabled, and dependence is enabled.
+  # If FALSE (unchecked), then balance is enabled, and dependence is disabled.
+  observe(toggleState('dependence', input$enableDependence))
+  observe(toggleState('balance', input$enableDependence %>% not))
 
   # Reactive switch
   # Based on the selected distribution,
@@ -249,12 +272,12 @@ server <- function(input, output, session) {
   # sequence of groups, should be c(1,2,3,4), as input$groups is set at 4.
   Group=isolate(seq(input$groups))
   # MuMin, MuMax are the minimum and maximum values for mu.
-  # If input$mu (difference between groups on mu) is at 0.01,
+  # If input$mu (difference between groups on mu) is at abs(0.01),
   #  1 group should be at -1, and another group at +1.
   MuMin=-1
   MuMax=1
   # VarMin, VarMax are the minimum and maximum for variance.
-  # If input$var (difference between groups on var) is at 0.01,
+  # If input$var (difference between groups on var) is at abs(0.01),
   #  1 group should be at 1, and another group at 10.
   VarMin=1
   VarMax=10
@@ -262,7 +285,7 @@ server <- function(input, output, session) {
   Df1=isolate(input$groups-1)
   Df2=isolate(input$samplesize-input$groups)
   # Non-centrality parameter, changes with group difference on mu (input$mu)
-  Lambda = reactive(input$samplesize*0.39*(1-input$mu))
+  Lambda = reactive(input$samplesize*0.39*(1-abs(input$mu)))
   # Skewness factor (called alpha by the sn-distribution functions e.g. sn::dsn)
   # Set to 4 if the Skew-normal Distribution is selected, otherwise is at 0.
   Skew = reactive({
@@ -295,7 +318,7 @@ server <- function(input, output, session) {
   MuVec = reactive(
     sapply(
       seq(MuMin,MuMax,along.with=Group),
-      function(y) MuTrans(input$mu,y)
+      function(y) MuTrans(abs(input$mu),y)
     )
     )
   
@@ -303,13 +326,13 @@ server <- function(input, output, session) {
   VarVec = reactive(
     sapply(
       seq(VarMin,VarMax,along.with=Group),
-      function(y) VarTrans(input$var,y)
+      function(y) VarTrans(abs(input$var),y)
     )
   )
   
   # Create a vector of sample sizes, 1 for each group
   BalVec = reactive(
-    BalTrans(input$samplesize,input$balance,length(Group))
+    BalTrans(input$samplesize,abs(input$balance),length(Group))
   )
 
   # Find the minimum and maximum values based on the q-plot of the chosen distribution
@@ -355,7 +378,7 @@ server <- function(input, output, session) {
       )
   )
   
-  # This is a system that computes the sampled data.
+  # This is the system that computes the sampled data.
   # It is only reactive on 'input$sample'.
   # Normally, something like this should also work with
   #  eventReactive(), but I didn't get it to work, so I got a workaround.
@@ -368,9 +391,21 @@ server <- function(input, output, session) {
             Group,
             function(a) replicate(
               BalVec()[[a]],
-              expr = MuVec()[[a]] + 0 + DistFunc()[[3]](1,0,VarVec()[[a]])
+              expr = MuVec()[[a]] + DistFunc()[[3]](1,0,VarVec()[[a]])
             )
-          ) %>% unlist %>% as_tibble %>% unlist
+          ) %>%
+            # This part adds a dependence value to all values in a row (over groups).
+            # Note that if the dependence == 0, this value will always be 0.
+            # The arbitrary factor 3 is to make sure that the effect is noticable.
+            apply(
+              1,
+              function(b) {
+                add(
+                  b,
+                  DistFunc()[[3]](1,0,input$dependence*3)
+                )
+              }
+            ) %>% t %>% unlist %>% as_tibble %>% unlist
         ) %>% as_tibble %>% mutate(Grouping = rep(Group,BalVec()) %>% as.factor)
       ) %T>% {input$sample}
     )
